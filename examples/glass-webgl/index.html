@@ -1,0 +1,392 @@
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+
+	<body>
+<div id="Glassorx" style="position: absolute; left:0px; top:0px"></canvas>
+
+					
+<script src="js/three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/Stats.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/FresnelShader.js"></script>
+<script src="js/ShaderGodRays.js"></script>
+
+<script>
+/**
+ * @author Mr&Mrs(2014)
+ * Realtime glass effect, Based on 
+ * fresnel example and dynamic texture example.
+ */
+ 
+//  global variables
+var container, scene, camera, renderer, controls, stats,light;
+
+var clock = new THREE.Clock();
+var timer;
+
+var bgColor = 0xffcccc;
+var sunColor = 0x44ccff;
+var materialDepth;
+var postprocessing = { enabled : true };
+var windowHalfX = window.innerWidth / 2;
+var windowHalfY = window.innerHeight / 2;
+var margin = 100;
+var height = window.innerHeight - 2 * margin;
+var projector = new THREE.Projector();
+var sunPosition = new THREE.Vector3( -15000, 16000, 10000 );
+var screenSpacePosition = new THREE.Vector3();
+// custom global variables
+var refractSphere,gem, refractSphereCamera,gemCamera; // for refract material
+gem = new THREE.Object3D();
+init();
+animate();
+
+function init() 
+{
+	// SCENE
+	scene = new THREE.Scene();
+	// CAMERA
+	var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+	var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 80000;
+	camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+	scene.add(camera);
+	camera.position.set(0,150,400);
+	//camera.lookAt(scene.position);	
+	// RENDERER
+	if ( Detector.webgl )
+		renderer = new THREE.WebGLRenderer( {antialias:true} );
+	else
+		renderer = new THREE.CanvasRenderer(); 
+	renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+	container = document.getElementById( 'Glassorx' );
+	container.appendChild( renderer.domElement );
+
+	// CONTROLS
+	controls = new THREE.OrbitControls( camera, renderer.domElement );
+	// STATS
+	stats = new Stats();
+	stats.domElement.style.position = 'absolute';
+	stats.domElement.style.bottom = '0px';
+	stats.domElement.style.zIndex = 100;
+	container.appendChild( stats.domElement );
+
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		LIGHT								//
+	//////////////////////////////////////////////////////////////////////////////////
+	// LIGHT
+	var spherelight = new THREE.PointLight(0xfffccc);
+	spherelight.position.set(0,0,0);
+	scene.add(spherelight);
+
+ 	light   = new THREE.SpotLight(0xfffccc,10, 6000 );
+	light.position.set( -3500*3.5, 2500, 11500*5 );   //using this light.position as referance for "godray"lights, any vector3 will do,rename accordingly.
+//	light.rotation.set( 0, Math.PI/2, 0 );
+	scene.add( light );
+
+	// add subtle ambient lighting
+	ambientLight = new THREE.AmbientLight(0xffffff);
+	ambientLight.intensity = 22.2;
+	ambientLight.color.setHex( 0xffffff );
+	scene.add(ambientLight);
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		FLOOR								//
+	//////////////////////////////////////////////////////////////////////////////////
+	//////
+	// FLOOR , a plane using meshlambertmaterial
+	floorTexture = new THREE.ImageUtils.loadTexture( 'images/icon-info.png' );
+	//floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+	floorTexture.repeat.set( 1, 1 );
+	floorMaterial = new THREE.MeshLambertMaterial( { 
+		map: floorTexture, 
+		side:THREE.DoubleSide,
+		ambient: 0x030303, color: 0xdddfff,
+		specular: 0.9,
+		shininess: 30, 
+		shading: THREE.FlatShading
+	});
+
+	floorGeometry = new THREE.PlaneGeometry(10000, 10000, 10, 10);
+	floor = new THREE.Mesh(floorGeometry, floorMaterial);
+	floor.position.y = -1400.5;
+	floor.rotation.x = Math.PI / 2;
+	// scene.add(floor);
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Skybox								//
+	//////////////////////////////////////////////////////////////////////////////////
+
+;(function(){
+	// SKYBOX : a method for creating a skybox, just a skybox, pretty much a copy/paste from some random example.
+	imagePrefix = "images/";
+	directions  = ["posx", "negx", "posy", "negy", "posz", "negz"];
+	imageSuffix = ".jpg";
+	skyGeometry = new THREE.BoxGeometry( 50000, 50000, 50000 );		
+	materialArray = [];
+	for (var i = 0; i < 6; i++){
+		materialArray.push( new THREE.MeshLambertMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	}
+	skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
+})()
+
+	//////////////////////
+	// Refractive meshes//
+	/////////////////////
+	
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Comment								//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	// create geometry
+	var refractSphereGeometry=  new THREE.SphereGeometry( 280*4, 164, 32 );           
+	// create cubecamera for making "skybox pictures"
+	refractSphereCamera	= new THREE.CubeCamera( 0.9, 40000, 256 );
+	scene.add( refractSphereCamera );
+
+	//set rendertarget for camera to three.cuberefractionmapping
+	refractSphereCamera.renderTarget.mapping = new THREE.CubeRefractionMapping();  
+
+
+	material = new THREE.ShaderMaterial({
+		fragmentShader	: THREE.FresnelShader.fragmentShader,
+		vertexShader	: THREE.FresnelShader.vertexShader,
+		uniforms	: THREE.UniformsUtils.clone( THREE.FresnelShader.uniforms ),
+		envMap		: refractSphereCamera.renderTarget
+	});
+	material.uniforms[ "tCube" ].value = refractSphereCamera.renderTarget;
+
+
+	// create shadermaterial with parameters
+	//setup mesh#1 using material#1
+	refractSphere = new THREE.Mesh( refractSphereGeometry, material );
+	refractSphere.position.set(1500,-00,-6500);
+	refractSphereCamera.position = refractSphere.position;
+
+	scene.add(refractSphere);
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Comment								//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	var geometryGem	=  new THREE.CylinderGeometry( 180, 16, 300,12 );
+	
+	//a low resolution, like 256 or lower is recommended for a scene with many cameras.
+	gemCamera = new THREE.CubeCamera( 0.9, 40000, 1024 );
+	scene.add( gemCamera );
+	
+	gemCamera.renderTarget.mapping = new THREE.CubeRefractionMapping();
+
+	var materialGem = new THREE.ShaderMaterial({
+		fragmentShader	: THREE.FresnelShader.fragmentShader,
+		vertexShader	: THREE.FresnelShader.vertexShader,
+		uniforms	: THREE.UniformsUtils.clone( THREE.FresnelShader.uniforms ),
+		envMap		: gemCamera.renderTarget
+	});
+	materialGem.uniforms[ "tCube" ].value = gemCamera.renderTarget; 
+
+	//setup mesh#2 using material#2
+	gem = new THREE.Mesh( geometryGem, materialGem );
+	gem.position.set(1500,2500,-1500);
+	gem.scale.set(15,15,15);	
+	gemCamera.position = gem.position;			
+	scene.add(gem );
+			
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Comment								//
+	//////////////////////////////////////////////////////////////////////////////////
+	initPostprocessing();	
+}
+
+function animate(){
+	requestAnimationFrame( animate );
+	render();		
+	update();
+}
+
+function update()
+{
+	timer = clock.getElapsedTime();
+	//// Move mesh#1 in a circular orbit.
+	// refractSphere.position.z += Math.sin(timer)*156;
+	// refractSphere.position.x += Math.cos(timer)*146;
+
+	// set cameraposition to match mesh position.
+	gemCamera.position		= gem.position;
+	refractSphereCamera.position	= refractSphere.position;
+
+	controls.update();
+	stats.update();
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////
+//		Comment								//
+//////////////////////////////////////////////////////////////////////////////////
+function initPostprocessing() {
+	//standard godrays init
+	postprocessing.scene = new THREE.Scene();
+	postprocessing.camera = new THREE.OrthographicCamera( window.innerWidth / - 2, window.innerWidth / 2,  height / 2, height / - 2, -10000, 10000 );
+	postprocessing.camera.position.z = 100;
+	postprocessing.scene.add( postprocessing.camera );
+
+	var pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat };
+	postprocessing.rtTextureColors = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+	postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+	var w = window.innerWidth / 2.0;
+	var h = height / 2.0;
+	postprocessing.rtTextureGodRays1 = new THREE.WebGLRenderTarget( w, h, pars );
+	postprocessing.rtTextureGodRays2 = new THREE.WebGLRenderTarget( w, h, pars );				
+
+	var godraysGenShader = THREE.ShaderGodRays[ "godrays_generate" ];
+	postprocessing.godrayGenUniforms = THREE.UniformsUtils.clone( godraysGenShader.uniforms );
+	postprocessing.materialGodraysGenerate = new THREE.ShaderMaterial( {
+		uniforms: postprocessing.godrayGenUniforms,
+		vertexShader: godraysGenShader.vertexShader,
+		fragmentShader: godraysGenShader.fragmentShader
+	} );
+
+	var godraysCombineShader = THREE.ShaderGodRays[ "godrays_combine" ];
+	postprocessing.godrayCombineUniforms = THREE.UniformsUtils.clone( godraysCombineShader.uniforms );
+	postprocessing.materialGodraysCombine = new THREE.ShaderMaterial( {
+		uniforms: postprocessing.godrayCombineUniforms,
+		vertexShader: godraysCombineShader.vertexShader,
+		fragmentShader: godraysCombineShader.fragmentShader
+	} );
+
+	var godraysFakeSunShader = THREE.ShaderGodRays[ "godrays_fake_sun" ];
+	postprocessing.godraysFakeSunUniforms = THREE.UniformsUtils.clone( godraysFakeSunShader.uniforms );
+	postprocessing.materialGodraysFakeSun = new THREE.ShaderMaterial( {
+		uniforms: postprocessing.godraysFakeSunUniforms,
+		vertexShader: godraysFakeSunShader.vertexShader,
+		fragmentShader: godraysFakeSunShader.fragmentShader
+	} );
+
+	postprocessing.godraysFakeSunUniforms.bgColor.value.setHex( bgColor );
+	postprocessing.godraysFakeSunUniforms.sunColor.value.setHex( sunColor );
+	postprocessing.godrayCombineUniforms.fGodRayIntensity.value = 1.75;
+
+	postprocessing.quad = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, height ), postprocessing.materialGodraysGenerate );
+	postprocessing.quad.position.z = -9900;
+	postprocessing.scene.add( postprocessing.quad );
+
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////
+//		Comment								//
+//////////////////////////////////////////////////////////////////////////////////
+function render() {
+	refractSphere.visible = false;	// prevent camera from rendering "self-object"
+	refractSphereCamera.updateCubeMap( renderer, scene );
+	refractSphere.visible = true;
+	
+	gem.visible = false;// prevent camera from rendering "self-object"
+	gemCamera.updateCubeMap( renderer, scene );
+	gem.visible = true;
+
+	if ( postprocessing.enabled ) {
+		///calculate view angle theta relative to scene.position and camera.position
+		retning	= new THREE.Vector3();
+		retning = light.position.sub(scene.position);
+		theta	= retning.dot( camera.position );
+		theta	*= 0.1;
+
+		sunPosition = light.position;
+		screenSpacePosition.copy( sunPosition );
+		projector.projectVector( screenSpacePosition, camera );
+		screenSpacePosition.x = ( screenSpacePosition.x + 1 ) / 2;
+		screenSpacePosition.y = ( screenSpacePosition.y + 1 ) / 2;					
+
+		//Only show effect when view direction is towards light source
+		if(theta >0){
+			postprocessing.godrayCombineUniforms.fGodRayIntensity.value = 0.14 ;
+		}else{
+			postprocessing.godrayCombineUniforms.fGodRayIntensity.value = 0.24*(1/theta) + 0.44 -theta*0.000000002 ;
+		}			
+		if(theta >0){
+			postprocessing.godrayGenUniforms[ "vSunPositionScreenSpace" ].value.x = screenSpacePosition.x;
+		}else{
+			postprocessing.godrayGenUniforms[ "vSunPositionScreenSpace" ].value.x = screenSpacePosition.x;
+		}
+		if(theta >0){
+			postprocessing.godrayGenUniforms[ "vSunPositionScreenSpace" ].value.y = screenSpacePosition.y;
+		}else{
+			postprocessing.godrayGenUniforms[ "vSunPositionScreenSpace" ].value.y = screenSpacePosition.y;
+		}
+
+		// Deactivated 
+		//postprocessing.godraysFakeSunUniforms[ "vSunPositionScreenSpace" ].value.x = screenSpacePosition.x; 
+		//	postprocessing.godraysFakeSunUniforms[ "vSunPositionScreenSpace" ].value.y = screenSpacePosition.y;
+		var sunsqH = 0.74 * height; // 0.74 depends on extent of sun from shader
+		var sunsqW = 0.74 * height; // both depend on height because sun is aspect-corrected
+
+		screenSpacePosition.x *= window.innerWidth;
+		screenSpacePosition.y *= height;
+		renderer.setScissor( screenSpacePosition.x - sunsqW / 2, screenSpacePosition.y - sunsqH / 2, sunsqW, sunsqH );
+		renderer.enableScissorTest( true );
+
+		postprocessing.godraysFakeSunUniforms[ "fAspect" ].value = window.innerWidth / height;
+		postprocessing.scene.overrideMaterial = postprocessing.materialGodraysFakeSun;
+		renderer.render( postprocessing.scene, postprocessing.camera, postprocessing.rtTextureColors );
+
+		renderer.enableScissorTest( false );
+		scene.overrideMaterial = null;
+		renderer.render( scene, camera, postprocessing.rtTextureColors );
+
+		scene.overrideMaterial = materialDepth;
+		renderer.render( scene, camera, postprocessing.rtTextureDepth, true );
+
+		var filterLen = 0.8;
+		var TAPS_PER_PASS = 6.0;
+		var pass = 1.0;
+		///////////STEPPING///////////////////
+		var stepLen = filterLen * Math.pow( TAPS_PER_PASS, -pass );
+		postprocessing.godrayGenUniforms[ "fStepSize" ].value = stepLen;
+		postprocessing.godrayGenUniforms[ "tInput" ].value = postprocessing.rtTextureDepth;
+		postprocessing.scene.overrideMaterial = postprocessing.materialGodraysGenerate;
+		renderer.render( postprocessing.scene, postprocessing.camera, postprocessing.rtTextureGodRays2 );
+
+		// pass 2 - render into second ping-pong target
+		pass = 2.0;
+		stepLen = filterLen * Math.pow( TAPS_PER_PASS, -pass );
+		postprocessing.godrayGenUniforms[ "fStepSize" ].value = stepLen;
+		postprocessing.godrayGenUniforms[ "tInput" ].value = postprocessing.rtTextureGodRays2;
+		renderer.render( postprocessing.scene, postprocessing.camera, postprocessing.rtTextureGodRays1  );
+
+		// pass 3 - 1st RT
+		pass = 3.0;
+		stepLen = filterLen * Math.pow( TAPS_PER_PASS, -pass );
+		postprocessing.godrayGenUniforms[ "fStepSize" ].value = stepLen;
+		postprocessing.godrayGenUniforms[ "tInput" ].value = postprocessing.rtTextureGodRays1;
+		renderer.render( postprocessing.scene, postprocessing.camera , postprocessing.rtTextureGodRays2  );
+
+		// final pass - composite god-rays onto colors
+		postprocessing.godrayCombineUniforms["tColors"].value = postprocessing.rtTextureColors;
+		postprocessing.godrayCombineUniforms["tGodRays"].value = postprocessing.rtTextureGodRays2;
+		postprocessing.scene.overrideMaterial = postprocessing.materialGodraysCombine;
+
+		renderer.render( postprocessing.scene, postprocessing.camera );
+		postprocessing.scene.overrideMaterial = null;
+	}else{
+
+		renderer.clear();
+		renderer.render( scene, camera );
+
+	}
+
+}
+
+
+</script>
+	</body>
+</html>

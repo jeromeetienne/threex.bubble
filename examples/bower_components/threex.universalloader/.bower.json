@@ -1,0 +1,14 @@
+{
+  "name": "threex.universalloader",
+  "homepage": "https://github.com/jeromeetienne/threex.universalloader",
+  "_release": "4a14004649",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "4a140046494026afb2fd5c7a4d2f03c93a8442d3"
+  },
+  "_source": "git://github.com/jeromeetienne/threex.universalloader.git",
+  "_target": "*",
+  "_originalSource": "threex.universalloader",
+  "_direct": true
+}

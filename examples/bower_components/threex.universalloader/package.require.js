@@ -1,0 +1,3 @@
+define( [ './threex.universalloader',
+	], function(){
+});
