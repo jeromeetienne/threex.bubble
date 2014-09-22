@@ -1,0 +1,14 @@
+{
+  "name": "threex.skymap",
+  "homepage": "https://github.com/jeromeetienne/threex.skymap",
+  "_release": "35430d0604",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "35430d06048fd4566266df93ce419f9c3fcf2d45"
+  },
+  "_source": "git://github.com/jeromeetienne/threex.skymap.git",
+  "_target": "*",
+  "_originalSource": "threex.skymap",
+  "_direct": true
+}

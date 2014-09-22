@@ -1,0 +1,14 @@
+{
+  "name": "threex.sslensflare",
+  "homepage": "https://github.com/jeromeetienne/threex.sslensflare",
+  "_release": "af5374c402",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "af5374c4028f80bf3fa8296d92606daffcb57eab"
+  },
+  "_source": "git://github.com/jeromeetienne/threex.sslensflare.git",
+  "_target": "*",
+  "_originalSource": "threex.sslensflare",
+  "_direct": true
+}

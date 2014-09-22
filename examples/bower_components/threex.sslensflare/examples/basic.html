@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<script src='vendor/three.js/build/three.min.js'></script>
+<!-- includes for THREE.EffectComposer -->
+<script src="vendor/three.js/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="vendor/three.js/examples/js/postprocessing/RenderPass.js"></script>
+<script src="vendor/three.js/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="vendor/three.js/examples/js/postprocessing/MaskPass.js"></script>
+<script src="vendor/three.js/examples/js/postprocessing/TexturePass.js"></script>
+<script src="vendor/three.js/examples/js/postprocessing/SavePass.js"></script>
+<script src="vendor/three.js/examples/js/shaders/CopyShader.js"></script>
+<script src="vendor/three.js/examples/js/shaders/HorizontalBlurShader.js"></script>
+<script src="vendor/three.js/examples/js/shaders/VerticalBlurShader.js"></script>
+<!-- include for threex.skymap -->
+<script src='bower_components/threex.skymap/threex.texturecube.js'></script>
+<script src='bower_components/threex.skymap/threex.skymap.js'></script>
+<!-- include for threex.sslensflare -->
+<script src='../threex.sslensflare.js'></script>
+<!-- include for threex.sslensflaredatgui -->
+<script src='vendor/three.js/examples/js/libs/dat.gui.min.js'></script>
+<script src='../threex.sslensflaredatgui.js'></script>
+<!-- include for body -->
+<body style='margin: 0px; background-color: #000000; overflow: hidden;'><script>
+;(function(){
+
+	var renderer	= new THREE.WebGLRenderer()
+	renderer.setSize( window.innerWidth, window.innerHeight )
+	document.body.appendChild( renderer.domElement )
+	renderer.setClearColor( 0x000000, 1 )
+
+	var updateFcts	= []
+	var scene	= new THREE.Scene()
+	var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000)
+	camera.position.z = 4
+
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		add skymap							//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	THREEx.TextureCube.initWellKnownUrls('bower_components/threex.skymap/')
+	var mesh	= THREEx.createSkymap('swedishroyalcastle')
+	scene.add( mesh );
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Camera Controls							//
+	//////////////////////////////////////////////////////////////////////////////////
+	var mouse	= {x : 0, y : 0}
+	var controlsEnabled	= true
+	document.addEventListener('mousemove', function(event){
+		// honor controlsEnabled
+		if(controlsEnabled === false) return
+	
+		mouse.x	= (event.clientX / window.innerWidth ) - 0.5
+		mouse.y	= (event.clientY / window.innerHeight) - 0.5
+	}, false)
+	updateFcts.push(function(delta, now){
+		camera.position.x += (mouse.x*5 - camera.position.x) * (delta*3)
+		camera.position.y += (mouse.y*5 - camera.position.y) * (delta*3)
+		camera.lookAt( scene.position )
+	})
+
+	renderer.domElement.addEventListener('click', function(event){
+		controlsEnabled	= controlsEnabled === true ? false : true
+	}, false)
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render Color							//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	var colorRenderTarget	= new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+		minFilter	: THREE.LinearFilter,
+		magFilter	: THREE.LinearFilter,
+		format		: THREE.RGBFormat,
+	});
+	updateFcts.push(function(){
+		renderer.render( scene, camera, colorRenderTarget );		
+	})
+
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Comment								//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	var lensRenderTarget	= new THREE.WebGLRenderTarget(colorRenderTarget.width/2, colorRenderTarget.height/2, {
+		minFilter	: THREE.LinearFilter,
+		magFilter	: THREE.LinearFilter,
+		format		: THREE.RGBFormat,
+	});
+	var composerLens	= new THREE.EffectComposer(renderer, lensRenderTarget)
+
+	// actually render it
+	updateFcts.push(function(delta, now){
+		composerLens.render(delta);
+	})	
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render ssLensFlare						//
+	//////////////////////////////////////////////////////////////////////////////////
+	var ssLensFlare	= new THREEx.SsLensFlare.Passes(renderer, colorRenderTarget, lensRenderTarget)
+	ssLensFlare.addPassesTo(composerLens)
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		blend Color with ssLensFlare					//
+	//////////////////////////////////////////////////////////////////////////////////
+	var composerBlend	= new THREE.EffectComposer(renderer);
+
+	// add Texture Pass
+	var effect	= new THREE.TexturePass(colorRenderTarget);
+	composerBlend.addPass( effect );
+
+	// special blend which make lensStar rotate based on camera rotation
+	var blendPass	= new THREEx.SsLensFlare.BlendPass(lensRenderTarget)
+	blendPass.addPassesTo(composerBlend)
+	updateFcts.push(function(){
+		blendPass.update(camera)
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Dat.GUI
+	//////////////////////////////////////////////////////////////////////////////////
+
+	// add a dat.gui
+	new THREEx.addSsLensFlare2DatGui(ssLensFlare, blendPass)
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Render the scene
+	//////////////////////////////////////////////////////////////////////////////////
+	// mark the last pass as ```renderToScreen```
+	composerBlend.passes[composerBlend.passes.length-1].renderToScreen	= true;
+	// actually render it
+	updateFcts.push(function(delta, now){
+		composerBlend.render(delta);
+	})	
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		loop runner							//
+	//////////////////////////////////////////////////////////////////////////////////
+	var lastTimeMsec= null
+	requestAnimationFrame(function animate(nowMsec){
+		// keep looping
+		requestAnimationFrame( animate );
+		// measure time
+		lastTimeMsec	= lastTimeMsec || nowMsec-1000/60
+		var deltaMsec	= Math.min(200, nowMsec - lastTimeMsec)
+		lastTimeMsec	= nowMsec
+		// call each update function
+		updateFcts.forEach(function(updateFn){
+			updateFn(deltaMsec/1000, nowMsec/1000)
+		})
+	})
+})()
+
+</script></body>

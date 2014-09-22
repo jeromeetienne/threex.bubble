@@ -139,12 +139,9 @@ function init()
 	scene.add( skyBox );
 })()
 
-	//////////////////////
-	// Refractive meshes//
-	/////////////////////
 	
 	//////////////////////////////////////////////////////////////////////////////////
-	//		Comment								//
+	//		refractSphere
 	//////////////////////////////////////////////////////////////////////////////////
 
 	// create geometry
@@ -175,10 +172,11 @@ function init()
 	scene.add(refractSphere);
 
 	//////////////////////////////////////////////////////////////////////////////////
-	//		Comment								//
+	//		gem
 	//////////////////////////////////////////////////////////////////////////////////
 
 	var geometryGem	=  new THREE.CylinderGeometry( 180, 16, 300,12 );
+	// var geometryGem	=  new THREE.CylinderGeometry( 100, 100, 300,12 );
 	
 	//a low resolution, like 256 or lower is recommended for a scene with many cameras.
 	gemCamera = new THREE.CubeCamera( 0.9, 40000, 1024 );
@@ -197,6 +195,7 @@ function init()
 	//setup mesh#2 using material#2
 	gem = new THREE.Mesh( geometryGem, materialGem );
 	gem.position.set(1500,2500,-1500);
+// gem.position.set(1500,00,-1500);
 	gem.scale.set(15,15,15);	
 	gemCamera.position = gem.position;			
 	scene.add(gem );
