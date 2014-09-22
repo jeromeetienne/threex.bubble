@@ -18,7 +18,7 @@ It shows a diamond with fresnel and a lensflare.
 * [examples/skull.html](http://jeromeetienne.github.io/threex.bubble/examples/skull.html)
 \[[view source](https://github.com/jeromeetienne/threex.bubble/blob/master/examples/skull.html)\] :
 It shows a glass skull in the sky.
-It is a remake of the excelent ["glass" demo](http://bartekdrozdz.com/project/glass) made by [bartek](http://bartekdrozdz.com/)
+It is a remake of the excelent ["glass" demo](http://bartekdrozdz.com/project/glass) made by [bartek](http://bartekdrozdz.com/) 
 
 How To Install It
 =================

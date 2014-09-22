@@ -22,7 +22,9 @@
 <script src='bower_components/threex.skymap/threex.texturecube.js'></script>
 <script src='bower_components/threex.skymap/threex.skymap.js'></script>
 
-<script src='bower_components/threex.spritelensflare/threex.spritelensflare.js'></script>
+<!-- include for threex.sslensflare -->
+<script src='bower_components/threex.sslensflare/threex.sslensflare.js'></script>
+<script src='bower_components/threex.sslensflare/threex.sslensflaredatgui.js'></script>
 
 
 <body style='margin: 0px; background-color: #bbbbbb; overflow: hidden;'><script>
@@ -33,25 +35,13 @@
 	var onRenderFcts= [];
 	var scene	= new THREE.Scene();
 	var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 2000 )
-	camera.position.z = -3
+	camera.position.z = 3
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//		create a texture Cube						//
 	//////////////////////////////////////////////////////////////////////////////////
 	THREEx.TextureCube.initWellKnownUrls('bower_components/threex.skymap/')
-	var textureCube	= THREEx.createTextureCube('skybox')
-
-	//////////////////////////////////////////////////////////////////////////////////
-	//		Comment								//
-	//////////////////////////////////////////////////////////////////////////////////	
-
-	THREEx.SpriteLensFlare.baseUrl	= 'bower_components/threex.spritelensflare/'
-
-	var flareColor	= new THREE.Color( 'red' );
-	var lensFlare	= new THREEx.SpriteLensFlare(flareColor)
-	lensFlare.position.set(-500, 200, 512);
-
-	scene.add( lensFlare );	
+	var textureCube	= THREEx.createTextureCube('swedishroyalcastle')
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//		Comment								//
@@ -62,43 +52,27 @@
 		vertexShader	: THREE.FresnelShader.vertexShader,
 		uniforms	: THREE.UniformsUtils.clone( THREE.FresnelShader.uniforms ),
 		shading		: THREE.FlatShading,
-		// side		: THREE.BackSide,
 	});
 	// set textureCube
 	material.uniforms[ "tCube" ].value = textureCube;
 
-	// THREEx.fresnelDatGui(material)
+	// var gui = new dat.GUI()
+	THREEx.fresnelDatGui(material)
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//		Comment								//
 	//////////////////////////////////////////////////////////////////////////////////
-	// var geometry	= new THREE.SphereGeometry(0.5, 32, 16)
-	// var object3d	= new THREE.Mesh(geometry, material)
-	// object3d.position.x	= 2
-	// scene.add(object3d)
-
-	// var geometry	= new THREE.BoxGeometry(0.5, 0.5, 0.5)
-	// var object3d	= new THREE.Mesh(geometry, material)
-	// object3d.position.x	= -1.5
-	// scene.add(object3d)
-
-	// var geometry	= new THREE.CylinderGeometry(0.5, 0.5, 1, 32, 1, false)
-	// var object3d	= new THREE.Mesh(geometry, material)
-	// object3d.position.x	= -2.5
-	// scene.add(object3d)
-
 
 	// build a diamon geometry
 	var geometry	= new THREE.Geometry();
-	var tmpGeometry	= new THREE.CylinderGeometry(0.5, 0.9, 0.2, 20, 1, false)
+	var tmpGeometry	= new THREE.CylinderGeometry(0.5, 0.9, 0.2, 12, 1, false)
 	var tmpMatrix	= new THREE.Matrix4().makeTranslation(0, +tmpGeometry.parameters.height/2, 0)
 	geometry.merge(tmpGeometry, tmpMatrix)
-	var tmpGeometry	= new THREE.CylinderGeometry(0.9, 0, 1, 20, 1, false)
+	var tmpGeometry	= new THREE.CylinderGeometry(0.9, 0, 1, 12, 1, false)
 	var tmpMatrix	= new THREE.Matrix4().makeTranslation(0, -tmpGeometry.parameters.height/2, 0)
 	geometry.merge(tmpGeometry, tmpMatrix)
 
 	var object3d	= new THREE.Mesh(geometry, material)
-	// object3d.scale.multiplyScalar(1.5)
 	object3d.position.y	= 0.5
 	scene.add(object3d)
 	onRenderFcts.push(function(){
@@ -119,8 +93,8 @@
 	onRenderFcts.push(function(delta, now){
 		// honor controlsEnabled
 		if(controlsEnabled === false) return
-		camera.position.x += (mouse.x*5 +1 - camera.position.x) * (delta*3)
-		camera.position.y += (mouse.y*5 -1 - camera.position.y) * (delta*3)
+		camera.position.x += (mouse.x*5 - camera.position.x) * (delta*3)
+		camera.position.y += (mouse.y*5 - camera.position.y) * (delta*3)
 		camera.lookAt( scene.position )
 	})
 	renderer.domElement.addEventListener('click', function(event){
@@ -135,11 +109,75 @@
 	scene.add( mesh )
 
 	//////////////////////////////////////////////////////////////////////////////////
-	//		Render the scene
+	//		render Color							//
 	//////////////////////////////////////////////////////////////////////////////////
 
+	var colorRenderTarget	= new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+		minFilter	: THREE.LinearFilter,
+		magFilter	: THREE.LinearFilter,
+		format		: THREE.RGBFormat,
+	});
 	onRenderFcts.push(function(){
-		renderer.render( scene, camera );		
+		renderer.render( scene, camera, colorRenderTarget );		
+	})
+
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Comment								//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	var lensRenderTarget	= new THREE.WebGLRenderTarget(colorRenderTarget.width/2, colorRenderTarget.height/2, {
+		minFilter	: THREE.LinearFilter,
+		magFilter	: THREE.LinearFilter,
+		format		: THREE.RGBFormat,
+	});
+	var composerLens	= new THREE.EffectComposer(renderer, lensRenderTarget)
+
+	// actually render it
+	onRenderFcts.push(function(delta, now){
+		composerLens.render(delta);
+	})	
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render ssLensFlare						//
+	//////////////////////////////////////////////////////////////////////////////////
+	
+	THREEx.SsLensFlare.baseUrl	= 'bower_components/threex.sslensflare/'
+
+	var ssLensFlare	= new THREEx.SsLensFlare.Passes(renderer, colorRenderTarget, lensRenderTarget)
+	ssLensFlare.addPassesTo(composerLens)
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		blend Color with ssLensFlare					//
+	//////////////////////////////////////////////////////////////////////////////////
+	var composerBlend	= new THREE.EffectComposer(renderer);
+
+	// add Texture Pass
+	var effect	= new THREE.TexturePass(colorRenderTarget);
+	composerBlend.addPass( effect );
+
+	// special blend which make lensStar rotate based on camera rotation
+	var blendPass	= new THREEx.SsLensFlare.BlendPass(lensRenderTarget)
+	blendPass.addPassesTo(composerBlend)
+	onRenderFcts.push(function(){
+		blendPass.update(camera)
+	})
+	//////////////////////////////////////////////////////////////////////////////////
+	//		Dat.GUI
+	//////////////////////////////////////////////////////////////////////////////////
+
+	// add a dat.gui
+	new THREEx.addSsLensFlare2DatGui(ssLensFlare, blendPass)
+
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render the scene						//
+	//////////////////////////////////////////////////////////////////////////////////
+
+	// mark the last pass as ```renderToScreen```
+	composerBlend.passes[composerBlend.passes.length-1].renderToScreen	= true;
+	// actually render it
+	onRenderFcts.push(function(delta, now){
+		composerBlend.render(delta);
 	})
 	
 	//////////////////////////////////////////////////////////////////////////////////
