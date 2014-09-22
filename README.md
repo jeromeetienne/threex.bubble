@@ -14,7 +14,10 @@ Show Don't Tell
 It shows a bubble with a texture cube.
 * [examples/diamond.html](http://jeromeetienne.github.io/threex.bubble/examples/diamond.html)
 \[[view source](https://github.com/jeromeetienne/threex.bubble/blob/master/examples/diamond.html)\] :
-It shows a diamond with fresnel and a lensflare.
+It shows a diamond with fresnel and a sprite lensflare.
+* [examples/diamond-sslensflare.html](http://jeromeetienne.github.io/threex.bubble/examples/diamond-sslensflare.html)
+\[[view source](https://github.com/jeromeetienne/threex.bubble/blob/master/examples/diamond-sslensflare.html)\] :
+It shows a diamond with fresnel and a screen space lensflare.
 * [examples/skull.html](http://jeromeetienne.github.io/threex.bubble/examples/skull.html)
 \[[view source](https://github.com/jeromeetienne/threex.bubble/blob/master/examples/skull.html)\] :
 It shows a glass skull in the sky.
